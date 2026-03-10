@@ -3,7 +3,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 # ---------- CONFIG ----------
 BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"          # Replace with your actual token
-ADMIN_ID = 1234567890                       # Replace with your Telegram user ID (optional)
+ADMIN_ID = 1234567890                       
 CONTACT_PRIMARY = "@yourprimarycontact"
 CONTACT_SUPPORT = "@yoursupport"
 CHANNEL_LINK = "https://t.me/your_channel"
