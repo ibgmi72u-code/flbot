@@ -1,26 +1,17 @@
-import os
-import threading
-import time
-from flask import Flask, request, jsonify
 import telebot
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# ---------- CONFIGURATION (replace with your own values) ----------
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", "1234567890"))   # Your Telegram user ID
-CONTACT_PRIMARY = "@yourprimarycontact"   # e.g. @deals_florida
+# ---------- CONFIG ----------
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"          # Replace with your actual token
+ADMIN_ID = 1234567890                       # Replace with your Telegram user ID (optional)
+CONTACT_PRIMARY = "@yourprimarycontact"
 CONTACT_SUPPORT = "@yoursupport"
 CHANNEL_LINK = "https://t.me/your_channel"
-# ------------------------------------------------------------------
+# ---------------------------
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
-app = Flask(__name__)
 
-# In‑memory storage for user IDs (for /stats and /broadcast)
-user_ids = set()
-
-# ---------- DATA DICTIONARIES (customize as needed) ----------
-
+# ---------- DATA (same as before) ----------
 LOCATIONS = {
     "fl_miami": {
         "name": "🌴 **MIAMI, FL**",
@@ -98,7 +89,6 @@ SERVICES = {
                    "• DoorDash: 50% off delivery fees for a month\n"
                    "• Local restaurants: BOGO entrees in Miami, Orlando, Newark\n"
                    "• Example: Use code FLHALF for $20 off your first order.",
-        "keywords": ["food delivery half off", "restaurant discounts", "Uber Eats promo", "DoorDash coupon"]
     },
     "rides": {
         "title": "🚗 **RIDESHARE 50% OFF**",
@@ -106,7 +96,6 @@ SERVICES = {
                    "• Lyft: Half‑off airport rides in FL & NJ\n"
                    "• Local taxis: 50% off first ride with code NJRIDE\n"
                    "• Example: Miami to South Beach for $5 instead of $10.",
-        "keywords": ["Uber half off", "Lyft discount", "rideshare deals", "airport rides half price"]
     },
     "rent": {
         "title": "🏠 **RENT 50% OFF FIRST MONTH**",
@@ -114,7 +103,6 @@ SERVICES = {
                    "• Miami luxury condos: Half‑off security deposit\n"
                    "• Orlando student housing: 50% off first month with student ID\n"
                    "• Example: Studio in Newark for $800 first month instead of $1600.",
-        "keywords": ["apartment deals", "first month half off", "rent discount", "student housing"]
     },
     "shopping": {
         "title": "🛍️ **SHOPPING 50% OFF**",
@@ -122,7 +110,6 @@ SERVICES = {
                    "• Jersey Gardens (NJ): Half‑off coupon book\n"
                    "• Online code SHOP50 for extra 50% off clearance\n"
                    "• Example: Nike shoes for $40 instead of $80.",
-        "keywords": ["shopping deals", "outlet mall discounts", "clothing half off", "electronics sale"]
     },
     "entertainment": {
         "title": "🎬 **ENTERTAINMENT 50% OFF**",
@@ -130,7 +117,6 @@ SERVICES = {
                    "• Concerts: 50% off select shows at Hard Rock Live\n"
                    "• Attractions: Half‑off admission to Miami Zoo, Adventure Aquarium\n"
                    "• Example: Universal Studios tickets 50% off on Wednesdays.",
-        "keywords": ["movie deals", "concert discounts", "theme park half off", "attraction coupons"]
     }
 }
 
@@ -151,9 +137,8 @@ SEO_KEYWORDS = {
     ]
 }
 
-# ---------- UTILITY FUNCTIONS ----------
-def build_menu_buttons():
-    """Return the main menu inline keyboard."""
+# ---------- MENU BUILDING ----------
+def main_menu():
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
         InlineKeyboardButton("📍 Locations", callback_data="menu_locations"),
@@ -163,170 +148,98 @@ def build_menu_buttons():
     )
     return markup
 
-# ---------- BOT COMMAND HANDLERS ----------
+# ---------- COMMANDS ----------
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    user_ids.add(message.from_user.id)
     welcome_text = (
         "👋 *Welcome to Florida & New Jersey Half‑Off Bot!*\n\n"
         "I help you find **50% OFF** deals on food, rides, rent, shopping, and entertainment "
         "across Florida and New Jersey.\n\n"
-        "Choose an option below to get started 👇"
+        "Choose an option below 👇"
     )
-    bot.send_message(message.chat.id, welcome_text, reply_markup=build_menu_buttons())
+    bot.send_message(message.chat.id, welcome_text, reply_markup=main_menu())
 
-@bot.message_handler(commands=['stats'])
-def stats_command(message):
-    if message.from_user.id != ADMIN_ID:
-        bot.reply_to(message, "⛔ You are not authorized to use this command.")
-        return
-    bot.reply_to(message, f"📊 *Total users seen:* {len(user_ids)}")
-
-@bot.message_handler(commands=['broadcast'])
-def broadcast_command(message):
-    if message.from_user.id != ADMIN_ID:
-        bot.reply_to(message, "⛔ Unauthorized.")
-        return
-    msg = bot.reply_to(message, "📢 Send the message you want to broadcast to all users:")
-    bot.register_next_step_handler(msg, send_broadcast)
-
-def send_broadcast(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    text = message.text
-    success = 0
-    fail = 0
-    for uid in user_ids:
-        try:
-            bot.send_message(uid, f"📢 *Broadcast:*\n\n{text}")
-            success += 1
-        except Exception:
-            fail += 1
-    bot.reply_to(message, f"✅ Broadcast sent to {success} users.\n❌ Failed: {fail}")
-
-# ---------- CALLBACK QUERY HANDLERS ----------
+# ---------- CALLBACKS ----------
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     data = call.data
 
-    # Main menu
     if data == "menu_locations":
         markup = InlineKeyboardMarkup(row_width=2)
-        # Create a list of buttons for each location (using keys)
-        loc_buttons = []
-        for loc_key, loc_info in LOCATIONS.items():
-            loc_buttons.append(InlineKeyboardButton(loc_info["name"], callback_data=f"loc_{loc_key}"))
-        markup.add(*loc_buttons)
-        markup.add(InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main"))
+        buttons = []
+        for key, loc in LOCATIONS.items():
+            buttons.append(InlineKeyboardButton(loc["name"], callback_data=f"loc_{key}"))
+        markup.add(*buttons)
+        markup.add(InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
         bot.edit_message_text("📍 *Select a location:*", call.message.chat.id, call.message.message_id,
                               reply_markup=markup)
 
     elif data == "menu_services":
         markup = InlineKeyboardMarkup(row_width=2)
-        serv_buttons = []
-        for serv_key, serv_info in SERVICES.items():
-            serv_buttons.append(InlineKeyboardButton(serv_info["title"], callback_data=f"serv_{serv_key}"))
-        markup.add(*serv_buttons)
-        markup.add(InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main"))
+        buttons = []
+        for key, serv in SERVICES.items():
+            buttons.append(InlineKeyboardButton(serv["title"], callback_data=f"serv_{key}"))
+        markup.add(*buttons)
+        markup.add(InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
         bot.edit_message_text("🎯 *Choose a service category:*", call.message.chat.id, call.message.message_id,
                               reply_markup=markup)
 
     elif data == "menu_contact":
-        contact_text = (
+        text = (
             "📞 *Contact Information*\n\n"
             f"Primary: {CONTACT_PRIMARY}\n"
             f"Support: {CONTACT_SUPPORT}\n"
             f"Channel: {CHANNEL_LINK}\n\n"
-            "Feel free to reach out for partnership or questions!"
+            "Feel free to reach out!"
         )
-        markup = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main"))
-        bot.edit_message_text(contact_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        markup = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
     elif data == "menu_keywords":
-        keywords_text = (
+        text = (
             "🔑 *SEO Keywords we target:*\n\n"
             "*Primary:*\n" + ", ".join(SEO_KEYWORDS["primary"]) + "\n\n"
             "*Secondary:*\n" + ", ".join(SEO_KEYWORDS["secondary"]) + "\n\n"
             "*Location‑based:*\n" + ", ".join(SEO_KEYWORDS["location_based"]) + "\n\n"
             "*Service‑based:*\n" + ", ".join(SEO_KEYWORDS["service_based"])
         )
-        markup = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main"))
-        bot.edit_message_text(keywords_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        markup = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Main Menu", callback_data="back_main"))
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
     elif data.startswith("loc_"):
-        loc_key = data[4:]
-        loc = LOCATIONS.get(loc_key)
-        if not loc:
-            bot.answer_callback_query(call.id, "Location not found.")
-            return
-        text = f"{loc['name']}\n\n*Neighborhoods:* {', '.join(loc['neighborhoods'])}\n\n{loc['details']}"
-        markup = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("🔙 Back to Locations", callback_data="menu_locations"),
-            InlineKeyboardButton("🏠 Main Menu", callback_data="back_to_main")
-        )
-        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        key = data[4:]
+        loc = LOCATIONS.get(key)
+        if loc:
+            text = f"{loc['name']}\n\n*Neighborhoods:* {', '.join(loc['neighborhoods'])}\n\n{loc['details']}"
+            markup = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("🔙 Back to Locations", callback_data="menu_locations"),
+                InlineKeyboardButton("🏠 Main Menu", callback_data="back_main")
+            )
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
     elif data.startswith("serv_"):
-        serv_key = data[5:]
-        serv = SERVICES.get(serv_key)
-        if not serv:
-            bot.answer_callback_query(call.id, "Service not found.")
-            return
-        text = f"{serv['title']}\n\n{serv['details']}"
-        markup = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("🔙 Back to Services", callback_data="menu_services"),
-            InlineKeyboardButton("🏠 Main Menu", callback_data="back_to_main")
-        )
-        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        key = data[5:]
+        serv = SERVICES.get(key)
+        if serv:
+            text = f"{serv['title']}\n\n{serv['details']}"
+            markup = InlineKeyboardMarkup().add(
+                InlineKeyboardButton("🔙 Back to Services", callback_data="menu_services"),
+                InlineKeyboardButton("🏠 Main Menu", callback_data="back_main")
+            )
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
-    elif data == "back_to_main":
-        bot.edit_message_text(
-            "👋 *Main Menu* – choose an option:",
-            call.message.chat.id,
-            call.message.message_id,
-            reply_markup=build_menu_buttons()
-        )
+    elif data == "back_main":
+        bot.edit_message_text("👋 *Main Menu* – choose an option:", call.message.chat.id,
+                              call.message.message_id, reply_markup=main_menu())
 
-    # Always answer callback to remove loading state
     bot.answer_callback_query(call.id)
 
 # ---------- DEFAULT HANDLER ----------
-@bot.message_handler(func=lambda message: True)
-def default_handler(message):
-    bot.reply_to(message, "I didn't understand that. Please use the buttons below.", reply_markup=build_menu_buttons())
+@bot.message_handler(func=lambda m: True)
+def default(message):
+    bot.reply_to(message, "Please use the buttons below.", reply_markup=main_menu())
 
-# ---------- FLASK WEBHOOK ROUTES ----------
-@app.route('/')
-def home():
-    return "Bot is running!"
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    json_str = request.get_data(as_text=True)
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return jsonify({"status": "ok"}), 200
-
-# ---------- SET WEBHOOK (run once on startup) ----------
-def set_webhook():
-    # Use Railway's public URL if available, otherwise fallback to a manually set WEBHOOK_URL
-    railway_url = os.environ.get('RAILWAY_STATIC_URL')
-    if railway_url:
-        webhook_url = f"https://{railway_url}/webhook"
-    else:
-        webhook_url = os.environ.get('WEBHOOK_URL', 'https://your-app.railway.app/webhook')
-    bot.remove_webhook()
-    bot.set_webhook(url=webhook_url)
-    print(f"Webhook set to {webhook_url}")
-
-if __name__ == '__main__':
-    # On Railway, we set the webhook and start the Flask server
-    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
-        set_webhook()
-        port = int(os.environ.get('PORT', 5000))
-        app.run(host='0.0.0.0', port=port)
-    else:
-        # Local testing with polling
-        bot.remove_webhook()
-        print("Starting polling...")
-        bot.infinity_polling()
+# ---------- START POLLING ----------
+if __name__ == "__main__":
+    print("Bot is polling...")
+    bot.infinity_polling()
