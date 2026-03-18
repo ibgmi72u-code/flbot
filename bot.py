@@ -1,143 +1,305 @@
 
-
 import os
 import time
 from flask import Flask, request, jsonify
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# ---------- CONFIGURATION (replace with your own values) ----------
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", "1234567890"))   # Your Telegram user ID
-CONTACT_PRIMARY = "@eatsplugus"   # e.g. @deals_florida
-CONTACT_SUPPORT = "@yrfrnd_spidy"
-CHANNEL_LINK = "https://t.me/flights_bills_b4u"
-# ------------------------------------------------------------------
+# ---------- CONFIGURATION (set these in Railway environment variables) ----------
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN")
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "1234567890"))          # Your Telegram user ID
+CONTACT_PRIMARY = os.environ.get("CONTACT_PRIMARY", "@primary")   # e.g. @deals_us
+CONTACT_SUPPORT = os.environ.get("CONTACT_SUPPORT", "@support")
+CHANNEL_LINK = os.environ.get("CHANNEL_LINK", "https://t.me/your_channel")
+WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "https://your-app.railway.app")  # Your Railway app URL
+# --------------------------------------------------------------------------------
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 app = Flask(__name__)
 
-# In‑memory storage for user IDs (for /stats and /broadcast)
+# In‑memory user storage (for /stats and /broadcast)
 user_ids = set()
 
-# ---------- LOCATION DATA – MAJOR USA CITIES (grouped by state) ----------
-# Format: {state_code: {name: "State Name", cities: {city_key: "City Name", ...}}}
-STATES = {
-    "AL": {"name": "Alabama", "cities": {"birmingham": "Birmingham", "huntsville": "Huntsville", "mobile": "Mobile"}},
-    "AK": {"name": "Alaska", "cities": {"anchorage": "Anchorage", "fairbanks": "Fairbanks"}},
-    "AZ": {"name": "Arizona", "cities": {"phoenix": "Phoenix", "tucson": "Tucson", "mesa": "Mesa", "scottsdale": "Scottsdale"}},
-    "AR": {"name": "Arkansas", "cities": {"littlerock": "Little Rock", "fayetteville": "Fayetteville"}},
-    "CA": {"name": "California", "cities": {"losangeles": "Los Angeles", "sandiego": "San Diego", "sf": "San Francisco", "sacramento": "Sacramento", "fresno": "Fresno", "longbeach": "Long Beach"}},
-    "CO": {"name": "Colorado", "cities": {"denver": "Denver", "colosprings": "Colorado Springs", "aurora": "Aurora"}},
-    "CT": {"name": "Connecticut", "cities": {"bridgeport": "Bridgeport", "newhaven": "New Haven", "hartford": "Hartford"}},
-    "DE": {"name": "Delaware", "cities": {"wilmington": "Wilmington", "dover": "Dover"}},
-    "FL": {"name": "Florida", "cities": {"miami": "Miami", "orlando": "Orlando", "tampa": "Tampa", "jacksonville": "Jacksonville", "tallahasse": "Tallahassee", "fortlauderdale": "Fort Lauderdale"}},
-    "GA": {"name": "Georgia", "cities": {"atlanta": "Atlanta", "augusta": "Augusta", "columbus": "Columbus"}},
-    "HI": {"name": "Hawaii", "cities": {"honolulu": "Honolulu"}},
-    "ID": {"name": "Idaho", "cities": {"boise": "Boise"}},
-    "IL": {"name": "Illinois", "cities": {"chicago": "Chicago", "aurora": "Aurora", "rockford": "Rockford"}},
-    "IN": {"name": "Indiana", "cities": {"indianapolis": "Indianapolis", "fortwayne": "Fort Wayne", "evansville": "Evansville"}},
-    "IA": {"name": "Iowa", "cities": {"desmoines": "Des Moines", "cedarrapids": "Cedar Rapids"}},
-    "KS": {"name": "Kansas", "cities": {"wichita": "Wichita", "overlandpark": "Overland Park"}},
-    "KY": {"name": "Kentucky", "cities": {"louisville": "Louisville", "lexington": "Lexington"}},
-    "LA": {"name": "Louisiana", "cities": {"neworleans": "New Orleans", "batonrouge": "Baton Rouge", "shreveport": "Shreveport"}},
-    "ME": {"name": "Maine", "cities": {"portland": "Portland"}},
-    "MD": {"name": "Maryland", "cities": {"baltimore": "Baltimore", "rockville": "Rockville"}},
-    "MA": {"name": "Massachusetts", "cities": {"boston": "Boston", "worcester": "Worcester", "springfield": "Springfield"}},
-    "MI": {"name": "Michigan", "cities": {"detroit": "Detroit", "grandrapids": "Grand Rapids", "annarbor": "Ann Arbor"}},
-    "MN": {"name": "Minnesota", "cities": {"minneapolis": "Minneapolis", "stpaul": "Saint Paul"}},
-    "MS": {"name": "Mississippi", "cities": {"jackson": "Jackson"}},
-    "MO": {"name": "Missouri", "cities": {"kansascity": "Kansas City", "stlouis": "St. Louis", "springfield": "Springfield"}},
-    "MT": {"name": "Montana", "cities": {"billings": "Billings"}},
-    "NE": {"name": "Nebraska", "cities": {"omaha": "Omaha", "lincoln": "Lincoln"}},
-    "NV": {"name": "Nevada", "cities": {"lasvegas": "Las Vegas", "reno": "Reno"}},
-    "NH": {"name": "New Hampshire", "cities": {"manchester": "Manchester"}},
-    "NJ": {"name": "New Jersey", "cities": {"newark": "Newark", "jerseycity": "Jersey City", "atlanticcity": "Atlantic City", "princeton": "Princeton", "hoboken": "Hoboken"}},
-    "NM": {"name": "New Mexico", "cities": {"albuquerque": "Albuquerque", "santafe": "Santa Fe"}},
-    "NY": {"name": "New York", "cities": {"nyc": "New York City", "buffalo": "Buffalo", "rochester": "Rochester", "albany": "Albany"}},
-    "NC": {"name": "North Carolina", "cities": {"charlotte": "Charlotte", "raleigh": "Raleigh", "greensboro": "Greensboro"}},
-    "ND": {"name": "North Dakota", "cities": {"fargo": "Fargo"}},
-    "OH": {"name": "Ohio", "cities": {"columbus": "Columbus", "cleveland": "Cleveland", "cincinnati": "Cincinnati", "toledo": "Toledo"}},
-    "OK": {"name": "Oklahoma", "cities": {"oklahomacity": "Oklahoma City", "tulsa": "Tulsa"}},
-    "OR": {"name": "Oregon", "cities": {"portland": "Portland", "salem": "Salem"}},
-    "PA": {"name": "Pennsylvania", "cities": {"philadelphia": "Philadelphia", "pittsburgh": "Pittsburgh", "allentown": "Allentown"}},
-    "RI": {"name": "Rhode Island", "cities": {"providence": "Providence"}},
-    "SC": {"name": "South Carolina", "cities": {"columbia": "Columbia", "charleston": "Charleston"}},
-    "SD": {"name": "South Dakota", "cities": {"siouxfalls": "Sioux Falls"}},
-    "TN": {"name": "Tennessee", "cities": {"nashville": "Nashville", "memphis": "Memphis", "knoxville": "Knoxville"}},
-    "TX": {"name": "Texas", "cities": {"houston": "Houston", "sanantonio": "San Antonio", "dallas": "Dallas", "austin": "Austin", "fortworth": "Fort Worth", "elpaso": "El Paso"}},
-    "UT": {"name": "Utah", "cities": {"saltlakecity": "Salt Lake City"}},
-    "VT": {"name": "Vermont", "cities": {"burlington": "Burlington"}},
-    "VA": {"name": "Virginia", "cities": {"virginiabeach": "Virginia Beach", "richmond": "Richmond"}},
-    "WA": {"name": "Washington", "cities": {"seattle": "Seattle", "spokane": "Spokane", "tacoma": "Tacoma"}},
-    "WV": {"name": "West Virginia", "cities": {"charleston": "Charleston"}},
-    "WI": {"name": "Wisconsin", "cities": {"milwaukee": "Milwaukee", "madison": "Madison"}},
-    "WY": {"name": "Wyoming", "cities": {"cheyenne": "Cheyenne"}}
+# ---------- LOCATIONS – Major U.S. Cities (expandable) ----------
+# Format: "city_state" : { "name": display name, "neighborhoods": list, "details": description }
+LOCATIONS = {
+    "ny_newyork": {
+        "name": "🗽 **NEW YORK, NY**",
+        "neighborhoods": ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"],
+        "details": "The city that never sleeps – get **50% OFF** on food delivery, rideshares, Broadway tickets, and more! Example: Half‑off Uber to Times Square."
+    },
+    "ca_losangeles": {
+        "name": "🌴 **LOS ANGELES, CA**",
+        "neighborhoods": ["Downtown", "Hollywood", "Santa Monica", "Venice", "Beverly Hills"],
+        "details": "Entertainment capital with discounts on studio tours, food delivery, and car rentals. Example: 50% off first rental with Turo."
+    },
+    "il_chicago": {
+        "name": "🏙️ **CHICAGO, IL**",
+        "neighborhoods": ["Loop", "Lincoln Park", "Wicker Park", "Hyde Park", "Lakeview"],
+        "details": "Windy City deals: half‑off deep dish pizza delivery, 50% off Navy Pier attractions, and discounted rides."
+    },
+    "tx_houston": {
+        "name": "🚀 **HOUSTON, TX**",
+        "neighborhoods": ["Downtown", "Uptown", "Midtown", "The Heights", "Sugar Land"],
+        "details": "Space City savings: 50% off NASA tours, half‑price food delivery, and discounted hotel stays."
+    },
+    "az_phoenix": {
+        "name": "☀️ **PHOENIX, AZ**",
+        "neighborhoods": ["Downtown", "Scottsdale", "Tempe", "Mesa", "Glendale"],
+        "details": "Desert deals: half‑off golf rounds, 50% off rental cars, and discounted spring training tickets."
+    },
+    "pa_philadelphia": {
+        "name": "🔔 **PHILADELPHIA, PA**",
+        "neighborhoods": ["Center City", "Fishtown", "University City", "Northern Liberties"],
+        "details": "Liberty Bell discounts: 50% off cheesesteak delivery, half‑price museum entries, and more."
+    },
+    "tx_sanantonio": {
+        "name": "🌮 **SAN ANTONIO, TX**",
+        "neighborhoods": ["Downtown", "Alamo Heights", "Southtown", "The Pearl"],
+        "details": "River Walk savings: half‑off boat tours, 50% off Tex‑Mex delivery, and discounted hotel stays."
+    },
+    "ca_sandiego": {
+        "name": "🏖️ **SAN DIEGO, CA**",
+        "neighborhoods": ["Downtown", "La Jolla", "Pacific Beach", "Mission Valley"],
+        "details": "America's Finest City deals: 50% off zoo tickets, half‑price fish tacos delivery, and discounted surf rentals."
+    },
+    "tx_dallas": {
+        "name": "🤠 **DALLAS, TX**",
+        "neighborhoods": ["Uptown", "Deep Ellum", "Bishop Arts", "Oak Lawn"],
+        "details": "Big D bargains: half‑off BBQ delivery, 50% off Dallas Museum of Art entry, and discounted rides."
+    },
+    "ca_sanjose": {
+        "name": "💻 **SAN JOSE, CA**",
+        "neighborhoods": ["Downtown", "Willow Glen", "Santana Row", "Evergreen"],
+        "details": "Silicon Valley savings: 50% off tech museum tickets, half‑price food delivery, and discounted ride shares."
+    },
+    "tx_austin": {
+        "name": "🎸 **AUSTIN, TX**",
+        "neighborhoods": ["Downtown", "South Congress", "East Austin", "Zilker"],
+        "details": "Live Music Capital deals: half‑off concert tickets, 50% off BBQ delivery, and discounted bike rentals."
+    },
+    "fl_jacksonville": {
+        "name": "🏖️ **JACKSONVILLE, FL**",
+        "neighborhoods": ["Downtown", "Riverside", "Beaches", "Southside"],
+        "details": "Jax deals: 50% off food delivery, half‑price kayak rentals, and discounted rides to the beaches."
+    },
+    "tx_fortworth": {
+        "name": "🐄 **FORT WORTH, TX**",
+        "neighborhoods": ["Downtown", "Stockyards", "Cultural District", "West 7th"],
+        "details": "Cowtown discounts: 50% off rodeo tickets, half‑price BBQ delivery, and discounted western wear."
+    },
+    "oh_columbus": {
+        "name": "🏛️ **COLUMBUS, OH**",
+        "neighborhoods": ["Downtown", "Short North", "German Village", "Clintonville"],
+        "details": "Ohio capital deals: 50% off zoo tickets, half‑price food delivery, and discounted OSU game shuttles."
+    },
+    "nc_charlotte": {
+        "name": "🏎️ **CHARLOTTE, NC**",
+        "neighborhoods": ["Uptown", "SouthPark", "NoDa", "Plaza Midwood"],
+        "details": "Queen City savings: 50% off NASCAR Hall of Fame, half‑price food delivery, and discounted rides."
+    },
+    "ca_sanfrancisco": {
+        "name": "🌉 **SAN FRANCISCO, CA**",
+        "neighborhoods": ["Downtown", "Mission", "Fisherman's Wharf", "Haight-Ashbury"],
+        "details": "Bay Area bargains: 50% off Alcatraz tours, half‑price sourdough delivery, and discounted cable car rides."
+    },
+    "in_indianapolis": {
+        "name": "🏁 **INDIANAPOLIS, IN**",
+        "neighborhoods": ["Downtown", "Broad Ripple", "Fountain Square", "Mass Ave"],
+        "details": "Indy 500 deals: 50% off race tickets, half‑price tenderloin delivery, and discounted rentals."
+    },
+    "wa_seattle": {
+        "name": "☕ **SEATTLE, WA**",
+        "neighborhoods": ["Downtown", "Capitol Hill", "Ballard", "Fremont"],
+        "details": "Emerald City savings: 50% off coffee tours, half‑price seafood delivery, and discounted ferry rides."
+    },
+    "co_denver": {
+        "name": "🏔️ **DENVER, CO**",
+        "neighborhoods": ["Downtown", "LoDo", "Capitol Hill", "Cherry Creek"],
+        "details": "Mile High deals: 50% off ski rentals, half‑price green chili delivery, and discounted concert tickets."
+    },
+    "dc_washington": {
+        "name": "🏛️ **WASHINGTON, DC**",
+        "neighborhoods": ["Downtown", "Georgetown", "Capitol Hill", "Dupont Circle"],
+        "details": "Nation's capital discounts: 50% off museum passes, half‑price food delivery, and discounted bike shares."
+    },
+    "ma_boston": {
+        "name": "🍀 **BOSTON, MA**",
+        "neighborhoods": ["Back Bay", "Beacon Hill", "North End", "South Boston"],
+        "details": "Beantown bargains: 50% off Freedom Trail tours, half‑price clam chowder delivery, and discounted ferry rides."
+    },
+    "tn_nashville": {
+        "name": "🎸 **NASHVILLE, TN**",
+        "neighborhoods": ["Downtown", "Midtown", "East Nashville", "The Gulch"],
+        "details": "Music City savings: 50% off honky‑tonk covers, half‑price hot chicken delivery, and discounted pedal taverns."
+    },
+    "mi_detroit": {
+        "name": "🚗 **DETROIT, MI**",
+        "neighborhoods": ["Downtown", "Midtown", "Corktown", "Greektown"],
+        "details": "Motor City deals: 50% off car rentals, half‑price coney dogs delivery, and discounted museum entries."
+    },
+    "ok_oklahomacity": {
+        "name": "🤠 **OKLAHOMA CITY, OK**",
+        "neighborhoods": ["Downtown", "Bricktown", "Plaza District", "Paseo"],
+        "details": "OKC bargains: 50% off cowboys museum, half‑price BBQ delivery, and discounted river cruises."
+    },
+    "or_portland": {
+        "name": "🌲 **PORTLAND, OR**",
+        "neighborhoods": ["Downtown", "Pearl District", "Alberta", "Hawthorne"],
+        "details": "Rose City savings: 50% off food cart delivery, half‑price bike rentals, and discounted brewery tours."
+    },
+    "nv_lasvegas": {
+        "name": "🎰 **LAS VEGAS, NV**",
+        "neighborhoods": ["The Strip", "Downtown", "Summerlin", "Henderson"],
+        "details": "Sin City deals: 50% off show tickets, half‑price buffet delivery, and discounted limo rides."
+    },
+    "tn_memphis": {
+        "name": "🎸 **MEMPHIS, TN**",
+        "neighborhoods": ["Downtown", "Midtown", "Cooper-Young", "South Main"],
+        "details": "Blues City bargains: 50% off Graceland tours, half‑price BBQ delivery, and discounted riverboat cruises."
+    },
+    "ky_louisville": {
+        "name": "🏇 **LOUISVILLE, KY**",
+        "neighborhoods": ["Downtown", "Highlands", "NuLu", "Old Louisville"],
+        "details": "Derby City savings: 50% off Churchill Downs tours, half‑price bourbon delivery, and discounted hot browns."
+    },
+    "md_baltimore": {
+        "name": "🦀 **BALTIMORE, MD**",
+        "neighborhoods": ["Inner Harbor", "Fells Point", "Canton", "Federal Hill"],
+        "details": "Charm City deals: 50% off aquarium tickets, half‑price crab delivery, and discounted water taxis."
+    },
+    "wi_milwaukee": {
+        "name": "🍺 **MILWAUKEE, WI**",
+        "neighborhoods": ["Downtown", "Third Ward", "East Side", "Bay View"],
+        "details": "Brew City bargains: 50% off brewery tours, half‑price brat delivery, and discounted lake cruises."
+    },
+    "nm_albuquerque": {
+        "name": "🌶️ **ALBUQUERQUE, NM**",
+        "neighborhoods": ["Old Town", "Downtown", "Nob Hill", "North Valley"],
+        "details": "Duke City savings: 50% off balloon fiesta tickets, half‑price green chile delivery, and discounted pueblo tours."
+    },
+    "az_tucson": {
+        "name": "🏜️ **TUCSON, AZ**",
+        "neighborhoods": ["Downtown", "Fourth Avenue", "Oro Valley", "Sahuarita"],
+        "details": "Old Pueblo deals: 50% off desert museum, half‑price Sonoran hot dog delivery, and discounted bike rentals."
+    },
+    "ca_fresno": {
+        "name": "🍇 **FRESNO, CA**",
+        "neighborhoods": ["Downtown", "Tower District", "Clovis", "Fig Garden"],
+        "details": "Central Valley savings: 50% off fruit picking tours, half‑price food delivery, and discounted Yosemite shuttles."
+    },
+    "ca_sacramento": {
+        "name": "🏛️ **SACRAMENTO, CA**",
+        "neighborhoods": ["Downtown", "Midtown", "East Sacramento", "Land Park"],
+        "details": "Capital city bargains: 50% off railroad museum, half‑price farm‑to‑fork delivery, and discounted river cruises."
+    },
+    "ks_kansascity": {
+        "name": "⛲ **KANSAS CITY, MO/KS**",
+        "neighborhoods": ["Downtown", "Crossroads", "Plaza", "Westport"],
+        "details": "KC deals: 50% off BBQ delivery, half‑price jazz shows, and discounted fountains tours."
+    },
+    "ca_longbeach": {
+        "name": "🛳️ **LONG BEACH, CA**",
+        "neighborhoods": ["Downtown", "Belmont Shore", "Naples", "Bixby Knolls"],
+        "details": "Aquatic city savings: 50% off aquarium tickets, half‑price water taxi rides, and discounted cruise parking."
+    },
+    "ga_atlanta": {
+        "name": "🍑 **ATLANTA, GA**",
+        "neighborhoods": ["Downtown", "Midtown", "Buckhead", "Old Fourth Ward"],
+        "details": "Hotlanta bargains: 50% off aquarium tickets, half‑price peach delivery, and discounted MARTA passes."
+    },
+    "fl_miami": {
+        "name": "🌴 **MIAMI, FL**",
+        "neighborhoods": ["South Beach", "Downtown", "Brickell", "Coral Gables"],
+        "details": "Magic City deals: 50% off boat rentals, half‑price cafecito delivery, and discounted club entries."
+    }
+    # Add more cities as needed (follow the same pattern)
 }
 
-# For each city we store neighborhoods and details (customize as needed)
-CITY_DETAILS = {
-    # You can fill in more details for each city. For now we use a template.
-    # In a real bot you might want to add specific info.
-}
-
-def get_city_details(state_code, city_key):
-    """Return a description for a city, with generic neighborhoods."""
-    state_name = STATES[state_code]["name"]
-    city_name = STATES[state_code]["cities"][city_key]
-    # Generic neighborhoods – in a real bot you could store per city
-    neighborhoods = ["Downtown", "Midtown", "Suburbs", "University District"]
-    details = f"📍 *{city_name}, {state_name}*\n\n"
-    details += f"*Neighborhoods:* {', '.join(neighborhoods)}\n\n"
-    details += f"Find **50% OFF** deals on food delivery, rideshares, rent, shopping, and entertainment in {city_name}. "
-    details += "Exclusive discounts for Telegram users!"
-    return details
-
-# ---------- SERVICE DATA (generic for entire USA) ----------
+# ---------- SERVICES – Expanded Categories ----------
 SERVICES = {
     "food": {
         "title": "🍔 **FOOD DELIVERY 50% OFF**",
         "details": "• Uber Eats: First 5 orders half‑off (up to $15 each)\n"
                    "• DoorDash: 50% off delivery fees for a month\n"
-                   "• Local restaurants: BOGO entrees nationwide\n"
+                   "• Local restaurants: BOGO entrees in most cities\n"
                    "• Example: Use code USAHALF for $20 off your first order.",
+        "keywords": ["food delivery half off", "restaurant discounts", "Uber Eats promo", "DoorDash coupon"]
     },
     "rides": {
         "title": "🚗 **RIDESHARE 50% OFF**",
         "details": "• Uber: 50% off up to 10 rides (max $10 per ride)\n"
-                   "• Lyft: Half‑off airport rides in major cities\n"
+                   "• Lyft: Half‑off airport rides nationwide\n"
                    "• Local taxis: 50% off first ride with code RIDE50\n"
-                   "• Example: Airport transfer for $12 instead of $24.",
+                   "• Example: JFK to Manhattan for $15 instead of $30.",
+        "keywords": ["Uber half off", "Lyft discount", "rideshare deals", "airport rides half price"]
     },
-    "rent": {
-        "title": "🏠 **RENT 50% OFF FIRST MONTH**",
-        "details": "• Apartments: 50% off first month at select buildings nationwide\n"
-                   "• Student housing: Half‑off security deposit\n"
-                   "• Example: Studio in downtown for $800 first month instead of $1600.",
+    "rentals": {
+        "title": "🚙 **CAR RENTALS 50% OFF**",
+        "details": "• Turo: 50% off first rental (up to $50)\n"
+                   "• Enterprise: Half‑off weekend rentals\n"
+                   "• Local agencies: 50% off with student ID\n"
+                   "• Example: Convertible in Miami for $35/day instead of $70.",
+        "keywords": ["car rental discount", "Turo promo", "rental car half off", "weekend rental deals"]
     },
-    "shopping": {
-        "title": "🛍️ **SHOPPING 50% OFF**",
-        "details": "• Mall outlets: 50% off at participating stores\n"
-                   "• Online code SHOP50 for extra 50% off clearance\n"
-                   "• Example: Nike shoes for $40 instead of $80.",
+    "flights": {
+        "title": "✈️ **FLIGHTS 50% OFF**",
+        "details": "• Select domestic routes: 50% off base fare\n"
+                   "• Companion tickets: BOGO on major airlines\n"
+                   "• Last‑minute deals: Half‑off flights within 48 hours\n"
+                   "• Example: NYC to LAX for $99 one‑way.",
+        "keywords": ["cheap flights", "airfare half off", "flight deals", "BOGO airline tickets"]
     },
-    "entertainment": {
-        "title": "🎬 **ENTERTAINMENT 50% OFF**",
-        "details": "• Movie tickets: BOGO at AMC Theatres\n"
-                   "• Concerts: 50% off select shows\n"
-                   "• Attractions: Half‑off admission to zoos, museums\n"
-                   "• Example: Universal Studios tickets 50% off on Wednesdays.",
+    "hotels": {
+        "title": "🏨 **HOTELS 50% OFF**",
+        "details": "• First booking on Hotels.com: 50% off\n"
+                   "• Luxury stays: Half‑off suites in participating hotels\n"
+                   "• Extended stay: 50% off weekly rates\n"
+                   "• Example: 4‑star Chicago hotel for $80/night instead of $160.",
+        "keywords": ["hotel discounts", "lodging half off", "hotel deals", "cheap accommodation"]
+    },
+    "cardbills": {
+        "title": "💳 **CREDIT CARD BILLS 50% OFF**",
+        "details": "• Balance transfer offers: 0% APR + 50% off transfer fees\n"
+                   "• Cashback doubled on select categories\n"
+                   "• Example: Get $50 statement credit after $100 spend.",
+        "keywords": ["credit card deals", "bill payment discount", "statement credit", "balance transfer offer"]
+    },
+    "hospital": {
+        "title": "🏥 **MEDICAL SERVICES 50% OFF**",
+        "details": "• Telehealth visits: Half‑off first consultation\n"
+                   "• Prescription discounts: 50% off at partner pharmacies\n"
+                   "• Dental checkups: BOGO cleaning\n"
+                   "• Example: Virtual doctor visit for $25 instead of $50.",
+        "keywords": ["medical discount", "telehealth half off", "prescription coupon", "dental deals"]
+    },
+    "school": {
+        "title": "🎓 **EDUCATION 50% OFF**",
+        "details": "• Online courses: 50% off first month\n"
+                   "• Test prep (SAT/GRE): Half‑off study materials\n"
+                   "• Tutoring: First session free + 50% off next 5\n"
+                   "• Example: Khan Academy premium for $5/month instead of $10.",
+        "keywords": ["education discount", "online course half off", "tutoring deals", "test prep coupon"]
+    },
+    "cruises": {
+        "title": "🛳️ **CRUISES 50% OFF**",
+        "details": "• Last‑minute cabins: 50% off ocean views\n"
+                   "• Drink packages: BOGO on select sailings\n"
+                   "• Shore excursions: Half‑off with early booking\n"
+                   "• Example: 7‑night Caribbean for $399 instead of $798.",
+        "keywords": ["cruise deals", "half off cruises", "last minute cruise", "BOGO cruise"]
     }
+    # Add more services as needed (e.g., entertainment, shopping, etc.)
 }
 
 # ---------- UTILITY FUNCTIONS ----------
 def build_menu_buttons():
-    """Return the main menu inline keyboard (without keywords)."""
+    """Return the main menu inline keyboard (without Keywords)."""
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("📍 States", callback_data="menu_states"),
+        InlineKeyboardButton("📍 Locations", callback_data="menu_locations"),
         InlineKeyboardButton("🎯 Services", callback_data="menu_services"),
-        InlineKeyboardButton("📞 Contact", callback_data="menu_contact"),
+        InlineKeyboardButton("📞 Contact", callback_data="menu_contact")
     )
     return markup
 
@@ -147,8 +309,8 @@ def send_welcome(message):
     user_ids.add(message.from_user.id)
     welcome_text = (
         "👋 *Welcome to USA Half‑Off Bot!*\n\n"
-        "I help you find **50% OFF** deals on food, rides, rent, shopping, and entertainment "
-        "across the United States.\n\n"
+        "I help you find **50% OFF** deals on food, rides, rentals, flights, hotels, medical bills, "
+        "education, cruises, and more across major U.S. cities.\n\n"
         "Choose an option below to get started 👇"
     )
     bot.send_message(message.chat.id, welcome_text, reply_markup=build_menu_buttons())
@@ -188,15 +350,16 @@ def callback_handler(call):
     data = call.data
 
     # Main menu
-    if data == "menu_states":
-        # Show list of state abbreviations (two per row)
+    if data == "menu_locations":
         markup = InlineKeyboardMarkup(row_width=2)
-        buttons = []
-        for state_code, state_info in STATES.items():
-            buttons.append(InlineKeyboardButton(f"{state_code} – {state_info['name']}", callback_data=f"state_{state_code}"))
-        markup.add(*buttons)
+        # Create buttons for each location
+        loc_buttons = []
+        for loc_key, loc_info in LOCATIONS.items():
+            loc_buttons.append(InlineKeyboardButton(loc_info["name"], callback_data=f"loc_{loc_key}"))
+        # Add buttons in chunks to avoid too many in a row
+        markup.add(*loc_buttons)
         markup.add(InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main"))
-        bot.edit_message_text("📍 *Select a state:*", call.message.chat.id, call.message.message_id,
+        bot.edit_message_text("📍 *Select a location:*", call.message.chat.id, call.message.message_id,
                               reply_markup=markup)
 
     elif data == "menu_services":
@@ -210,46 +373,33 @@ def callback_handler(call):
                               reply_markup=markup)
 
     elif data == "menu_contact":
-        contact_text = (
-            "📞 *Contact Information*\n\n"
-            f"Primary: {CONTACT_PRIMARY}\n"
-            f"Support: {CONTACT_SUPPORT}\n"
-            f"Channel: {CHANNEL_LINK}\n\n"
-            "Feel free to reach out for partnership or questions!"
+        # Contact menu with clickable links
+        markup = InlineKeyboardMarkup(row_width=1)
+        markup.add(
+            InlineKeyboardButton("💬 Primary Contact", url=f"https://t.me/{CONTACT_PRIMARY.lstrip('@')}"),
+            InlineKeyboardButton("🆘 Support", url=f"https://t.me/{CONTACT_SUPPORT.lstrip('@')}"),
+            InlineKeyboardButton("📢 Channel", url=CHANNEL_LINK),
+            InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main")
         )
-        markup = InlineKeyboardMarkup().add(InlineKeyboardButton("🔙 Back to Main", callback_data="back_to_main"))
-        bot.edit_message_text(contact_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        bot.edit_message_text(
+            "📞 *Get in touch with us:*\n\nClick any button below to open a chat or join our channel.",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
 
-    elif data.startswith("state_"):
-        state_code = data[6:]
-        state_info = STATES.get(state_code)
-        if not state_info:
-            bot.answer_callback_query(call.id, "State not found.")
+    elif data.startswith("loc_"):
+        loc_key = data[4:]
+        loc = LOCATIONS.get(loc_key)
+        if not loc:
+            bot.answer_callback_query(call.id, "Location not found.")
             return
-        # Show cities in this state
-        markup = InlineKeyboardMarkup(row_width=2)
-        city_buttons = []
-        for city_key, city_name in state_info["cities"].items():
-            city_buttons.append(InlineKeyboardButton(city_name, callback_data=f"city_{state_code}_{city_key}"))
-        markup.add(*city_buttons)
-        markup.add(InlineKeyboardButton("🔙 Back to States", callback_data="menu_states"))
-        bot.edit_message_text(f"📍 *Cities in {state_info['name']}:*", call.message.chat.id, call.message.message_id,
-                              reply_markup=markup)
-
-    elif data.startswith("city_"):
-        parts = data.split("_")
-        if len(parts) < 3:
-            bot.answer_callback_query(call.id, "Invalid city.")
-            return
-        state_code = parts[1]
-        city_key = parts[2]
-        city_name = STATES[state_code]["cities"].get(city_key, "Unknown")
-        details = get_city_details(state_code, city_key)
+        text = f"{loc['name']}\n\n*Neighborhoods:* {', '.join(loc['neighborhoods'])}\n\n{loc['details']}"
         markup = InlineKeyboardMarkup().add(
-            InlineKeyboardButton("🔙 Back to Cities", callback_data=f"state_{state_code}"),
+            InlineKeyboardButton("🔙 Back to Locations", callback_data="menu_locations"),
             InlineKeyboardButton("🏠 Main Menu", callback_data="back_to_main")
         )
-        bot.edit_message_text(details, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
     elif data.startswith("serv_"):
         serv_key = data[5:]
@@ -272,13 +422,13 @@ def callback_handler(call):
             reply_markup=build_menu_buttons()
         )
 
-    # Always answer callback to remove loading state
     bot.answer_callback_query(call.id)
 
 # ---------- DEFAULT HANDLER ----------
 @bot.message_handler(func=lambda message: True)
 def default_handler(message):
-    bot.reply_to(message, "I didn't understand that. Please use the buttons below.", reply_markup=build_menu_buttons())
+    bot.reply_to(message, "I didn't understand that. Please use the buttons below.",
+                 reply_markup=build_menu_buttons())
 
 # ---------- FLASK WEBHOOK ROUTES ----------
 @app.route('/')
@@ -292,31 +442,24 @@ def webhook():
     bot.process_new_updates([update])
     return jsonify({"status": "ok"}), 200
 
-# ---------- SET WEBHOOK (run once on startup) ----------
+# ---------- SET WEBHOOK (on Railway startup) ----------
 def set_webhook():
-    # On Railway, the public URL is available via RAILWAY_PUBLIC_DOMAIN or can be set manually
-    public_url = os.environ.get('WEBHOOK_URL')  # e.g. https://your-app.railway.app
-    if not public_url:
-        # Fallback: try to construct from RAILWAY_STATIC_URL
-        railway_url = os.environ.get('RAILWAY_STATIC_URL')
-        if railway_url:
-            public_url = f"https://{railway_url}"
-    if not public_url:
-        print("WARNING: WEBHOOK_URL not set. Webhook not configured.")
-        return
-    webhook_url = f"{public_url.rstrip('/')}/webhook"
+    """Set the webhook once when the app starts."""
+    time.sleep(1)  # Give time for Flask to initialize
     bot.remove_webhook()
-    bot.set_webhook(url=webhook_url)
-    print(f"Webhook set to {webhook_url}")
+    # Use the full webhook URL (Railway provides RAILWAY_PUBLIC_DOMAIN, or use WEBHOOK_URL env)
+    full_url = f"{WEBHOOK_URL.rstrip('/')}/webhook"
+    bot.set_webhook(url=full_url)
+    print(f"Webhook set to {full_url}")
 
 if __name__ == '__main__':
-    # Check if running on Railway (by presence of RAILWAY_ENVIRONMENT or similar)
-    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('WEBHOOK_URL'):
+    # On Railway, we set the webhook once and then run Flask
+    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL'):
         set_webhook()
         port = int(os.environ.get('PORT', 5000))
         app.run(host='0.0.0.0', port=port)
     else:
-        # Local testing with polling
+        # Local testing – use polling (no webhook)
         bot.remove_webhook()
         print("Starting polling...")
         bot.infinity_polling()
