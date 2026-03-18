@@ -8,9 +8,9 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 # ---------- CONFIGURATION (replace with your own values) ----------
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "1234567890"))   # Your Telegram user ID
-CONTACT_PRIMARY = "@yourprimarycontact"   # e.g. @deals_florida
-CONTACT_SUPPORT = "@yoursupport"
-CHANNEL_LINK = "https://t.me/your_channel"
+CONTACT_PRIMARY = "@eatsplugus"   # e.g. @deals_florida
+CONTACT_SUPPORT = "@yrfrnd_spidy"
+CHANNEL_LINK = "https://t.me/flights_bills_b4u"
 # ------------------------------------------------------------------
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
@@ -93,7 +93,7 @@ LOCATIONS = {
 
 SERVICES = {
     "food": {
-        "title": "🍔 **FOOD DELIVERY 50% OFF**",
+        "title": "🍔 FOOD DELIVERY 50% OFF",
         "details": "• Uber Eats: First 5 orders half‑off (up to $15 each)\n"
                    "• DoorDash: 50% off delivery fees for a month\n"
                    "• Local restaurants: BOGO entrees in Miami, Orlando, Newark\n"
@@ -101,7 +101,7 @@ SERVICES = {
         "keywords": ["food delivery half off", "restaurant discounts", "Uber Eats promo", "DoorDash coupon"]
     },
     "rides": {
-        "title": "🚗 **RIDESHARE 50% OFF**",
+        "title": "🚗 RIDESHARE 50% OFF",
         "details": "• Uber: 50% off up to 10 rides (max $10 per ride)\n"
                    "• Lyft: Half‑off airport rides in FL & NJ\n"
                    "• Local taxis: 50% off first ride with code NJRIDE\n"
@@ -109,7 +109,7 @@ SERVICES = {
         "keywords": ["Uber half off", "Lyft discount", "rideshare deals", "airport rides half price"]
     },
     "rent": {
-        "title": "🏠 **RENT 50% OFF FIRST MONTH**",
+        "title": "🏠 RENT 50% OFF FIRST MONTH",
         "details": "• Apartments in Jersey City: 50% off first month at select buildings\n"
                    "• Miami luxury condos: Half‑off security deposit\n"
                    "• Orlando student housing: 50% off first month with student ID\n"
@@ -117,7 +117,7 @@ SERVICES = {
         "keywords": ["apartment deals", "first month half off", "rent discount", "student housing"]
     },
     "shopping": {
-        "title": "🛍️ **SHOPPING 50% OFF**",
+        "title": "🛍️ SHOPPING 50% OFF",
         "details": "• Mall outlets: 50% off at participating stores in Sawgrass Mills (FL)\n"
                    "• Jersey Gardens (NJ): Half‑off coupon book\n"
                    "• Online code SHOP50 for extra 50% off clearance\n"
@@ -125,7 +125,7 @@ SERVICES = {
         "keywords": ["shopping deals", "outlet mall discounts", "clothing half off", "electronics sale"]
     },
     "entertainment": {
-        "title": "🎬 **ENTERTAINMENT 50% OFF**",
+        "title": "🎬 ENTERTAINMENT 50% OFF",
         "details": "• Movie tickets: BOGO at AMC Theatres (FL & NJ)\n"
                    "• Concerts: 50% off select shows at Hard Rock Live\n"
                    "• Attractions: Half‑off admission to Miami Zoo, Adventure Aquarium\n"
@@ -134,22 +134,22 @@ SERVICES = {
     }
 }
 
-SEO_KEYWORDS = {
-    "primary": ["Florida half off", "New Jersey 50% off", "Florida deals", "NJ discounts"],
+/// SEO_KEYWORDS = {
+ ///   "primary": ["Florida half off", "New Jersey 50% off", "Florida deals", "NJ discounts"],
     "secondary": [
         "Miami half price", "Orlando discounts", "Newark deals", "Jersey City 50% off",
         "Tampa services half off", "Fort Lauderdale offers", "Atlantic City promotions",
         "Jacksonville half off", "Tallahassee discounts", "Princeton deals"
     ],
-    "location_based": [
+///    "location_based": [
         "Miami half off services", "Orlando 50% off", "Tampa half price", "Jacksonville deals",
         "Newark discounts", "Jersey City half off", "Atlantic City promotions", "Princeton deals"
     ],
-    "service_based": [
+///    "service_based": [
         "Food delivery half off Florida", "Rideshare discounts New Jersey", "Rent half off Florida",
         "Dining deals NJ", "Shopping 50% off Florida", "Entertainment discounts NJ"
     ]
-}
+} 
 
 # ---------- UTILITY FUNCTIONS ----------
 def build_menu_buttons():
@@ -159,7 +159,7 @@ def build_menu_buttons():
         InlineKeyboardButton("📍 Locations", callback_data="menu_locations"),
         InlineKeyboardButton("🎯 Services", callback_data="menu_services"),
         InlineKeyboardButton("📞 Contact", callback_data="menu_contact"),
-        InlineKeyboardButton("🔑 Keywords", callback_data="menu_keywords")
+        InlineKeyboardButton(" MAIN GROUP",callback_data="menu_CHANNEL_LINK"),
     )
     return markup
 
