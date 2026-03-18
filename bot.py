@@ -159,7 +159,7 @@ def build_menu_buttons():
         InlineKeyboardButton("📍 Locations", callback_data="menu_locations"),
         InlineKeyboardButton("🎯 Services", callback_data="menu_services"),
         InlineKeyboardButton("📞 Contact", callback_data="menu_contact"),
-        InlineKeyboardButton(" MAIN GROUP",callback_data="menu_CHANNEL_LINK"),
+       
     )
     return markup
 
