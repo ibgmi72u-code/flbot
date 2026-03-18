@@ -219,7 +219,7 @@ LOCATIONS = {
 # ---------- SERVICES – Expanded Categories ----------
 SERVICES = {
     "food": {
-        "title": "🍔 **FOOD DELIVERY 50% OFF**",
+        "title": "🍔 *FOOD DELIVERY 50% OFF*",
         "details": "• Uber Eats: First 5 orders half‑off (up to $15 each)\n"
                    "• DoorDash: 50% off delivery fees for a month\n"
                    "• Local restaurants: BOGO entrees in most cities\n"
@@ -227,7 +227,7 @@ SERVICES = {
         "keywords": ["food delivery half off", "restaurant discounts", "Uber Eats promo", "DoorDash coupon"]
     },
     "rides": {
-        "title": "🚗 **RIDESHARE 50% OFF**",
+        "title": "🚗 *RIDESHARE 50% OFF*",
         "details": "• Uber: 50% off up to 10 rides (max $10 per ride)\n"
                    "• Lyft: Half‑off airport rides nationwide\n"
                    "• Local taxis: 50% off first ride with code RIDE50\n"
@@ -235,7 +235,7 @@ SERVICES = {
         "keywords": ["Uber half off", "Lyft discount", "rideshare deals", "airport rides half price"]
     },
     "rentals": {
-        "title": "🚙 **CAR RENTALS 50% OFF**",
+        "title": "🚙 *CAR RENTALS 50% OFF*",
         "details": "• Turo: 50% off first rental (up to $50)\n"
                    "• Enterprise: Half‑off weekend rentals\n"
                    "• Local agencies: 50% off with student ID\n"
@@ -243,7 +243,7 @@ SERVICES = {
         "keywords": ["car rental discount", "Turo promo", "rental car half off", "weekend rental deals"]
     },
     "flights": {
-        "title": "✈️ **FLIGHTS 50% OFF**",
+        "title": "✈️ *FLIGHTS 50% OFF*",
         "details": "• Select domestic routes: 50% off base fare\n"
                    "• Companion tickets: BOGO on major airlines\n"
                    "• Last‑minute deals: Half‑off flights within 48 hours\n"
@@ -251,7 +251,7 @@ SERVICES = {
         "keywords": ["cheap flights", "airfare half off", "flight deals", "BOGO airline tickets"]
     },
     "hotels": {
-        "title": "🏨 **HOTELS 50% OFF**",
+        "title": "🏨 *HOTELS 50% OFF*",
         "details": "• First booking on Hotels.com: 50% off\n"
                    "• Luxury stays: Half‑off suites in participating hotels\n"
                    "• Extended stay: 50% off weekly rates\n"
@@ -259,14 +259,14 @@ SERVICES = {
         "keywords": ["hotel discounts", "lodging half off", "hotel deals", "cheap accommodation"]
     },
     "cardbills": {
-        "title": "💳 **CREDIT CARD BILLS 50% OFF**",
+        "title": "💳 *CREDIT CARD BILLS 50% OFF*",
         "details": "• Balance transfer offers: 0% APR + 50% off transfer fees\n"
                    "• Cashback doubled on select categories\n"
                    "• Example: Get $50 statement credit after $100 spend.",
         "keywords": ["credit card deals", "bill payment discount", "statement credit", "balance transfer offer"]
     },
     "hospital": {
-        "title": "🏥 **MEDICAL SERVICES 50% OFF**",
+        "title": "🏥 *MEDICAL SERVICES 50% OFF*",
         "details": "• Telehealth visits: Half‑off first consultation\n"
                    "• Prescription discounts: 50% off at partner pharmacies\n"
                    "• Dental checkups: BOGO cleaning\n"
@@ -274,7 +274,7 @@ SERVICES = {
         "keywords": ["medical discount", "telehealth half off", "prescription coupon", "dental deals"]
     },
     "school": {
-        "title": "🎓 **EDUCATION 50% OFF**",
+        "title": "🎓 *EDUCATION 50% OFF*",
         "details": "• Online courses: 50% off first month\n"
                    "• Test prep (SAT/GRE): Half‑off study materials\n"
                    "• Tutoring: First session free + 50% off next 5\n"
@@ -282,7 +282,7 @@ SERVICES = {
         "keywords": ["education discount", "online course half off", "tutoring deals", "test prep coupon"]
     },
     "cruises": {
-        "title": "🛳️ **CRUISES 50% OFF**",
+        "title": "🛳️ *CRUISES 50% OFF*",
         "details": "• Last‑minute cabins: 50% off ocean views\n"
                    "• Drink packages: BOGO on select sailings\n"
                    "• Shore excursions: Half‑off with early booking\n"
@@ -309,7 +309,7 @@ def send_welcome(message):
     user_ids.add(message.from_user.id)
     welcome_text = (
         "👋 *Welcome to USA Half‑Off Bot!*\n\n"
-        "I help you find **50% OFF** deals on food, rides, rentals, flights, hotels, medical bills, "
+        "I help you find *50% OFF* deals on food, rides, rentals, flights, hotels, medical bills, "
         "education, cruises, and more across major U.S. cities.\n\n"
         "Choose an option below to get started 👇"
     )
